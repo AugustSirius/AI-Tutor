@@ -1,9 +1,11 @@
+cat > /var/www/aidamcell.com/index.html << 'EOF'
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Chat - aidamcell.com</title>
+    <title>AI Chat - Teaching Assistant</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -42,18 +44,32 @@
         }
 
         .sidebar-section {
-            margin-bottom: 30px;
+            margin-bottom: 20px;
         }
 
-        .sidebar-content {
+        .sidebar-item {
             background: #f5f5f5;
             padding: 15px;
             border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sidebar-item:hover {
+            background: #ebebeb;
+        }
+
+        .sidebar-item-title {
             font-size: 13px;
-            line-height: 1.6;
-            white-space: pre-wrap;
-            max-height: 300px;
-            overflow-y: auto;
+            font-weight: 500;
+        }
+
+        .sidebar-item-icon {
+            color: #666;
+            font-size: 18px;
         }
 
         .main {
@@ -175,11 +191,107 @@
             cursor: not-allowed;
         }
 
-        .loading {
+        /* Modal for full-page markdown display */
+        .modal {
             display: none;
-            padding: 12px 0;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .modal.active {
+            display: block;
+        }
+
+        .modal-content {
+            background: white;
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 40px;
+            border-radius: 12px;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 28px;
+            cursor: pointer;
             color: #666;
-            font-style: italic;
+            background: none;
+            border: none;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-close:hover {
+            color: #2c2c2c;
+        }
+
+        .markdown-content {
+            line-height: 1.8;
+            color: #2c2c2c;
+        }
+
+        .markdown-content h1 {
+            font-size: 28px;
+            margin: 30px 0 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e5e5e5;
+        }
+
+        .markdown-content h2 {
+            font-size: 24px;
+            margin: 25px 0 15px;
+        }
+
+        .markdown-content h3 {
+            font-size: 20px;
+            margin: 20px 0 12px;
+        }
+
+        .markdown-content p {
+            margin: 12px 0;
+        }
+
+        .markdown-content ul, .markdown-content ol {
+            margin: 12px 0;
+            padding-left: 30px;
+        }
+
+        .markdown-content li {
+            margin: 8px 0;
+        }
+
+        .markdown-content code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+
+        .markdown-content pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+
+        .markdown-content pre code {
+            background: none;
+            padding: 0;
         }
 
         @media (max-width: 768px) {
@@ -190,6 +302,11 @@
             .message-content {
                 max-width: 85%;
             }
+
+            .modal-content {
+                margin: 20px;
+                padding: 20px;
+            }
         }
     </style>
 </head>
@@ -197,32 +314,32 @@
     <div class="container">
         <div class="sidebar">
             <div class="sidebar-section">
-                <h3>System Prompt</h3>
-                <div class="sidebar-content" id="systemPrompt">
-You are a helpful AI assistant. You provide clear, accurate, and thoughtful responses to user questions.
+                <h3>Resources</h3>
+                
+                <div class="sidebar-item" onclick="showModal('systemPrompt')">
+                    <span class="sidebar-item-title">System Prompt</span>
+                    <span class="sidebar-item-icon">→</span>
                 </div>
             </div>
             
             <div class="sidebar-section">
-                <h3>Class Materials</h3>
-                <div class="sidebar-content" id="classMaterials">
-No class materials loaded yet.
-
-You can update this section with your course materials, resources, or reference documents.
+                <div class="sidebar-item" onclick="showModal('classMaterials')">
+                    <span class="sidebar-item-title">Class Materials</span>
+                    <span class="sidebar-item-icon">→</span>
                 </div>
             </div>
         </div>
 
         <div class="main">
             <div class="header">
-                <h1>AI Chat</h1>
+                <h1>AI Teaching Assistant</h1>
             </div>
 
             <div class="chat-container" id="chatContainer">
                 <div class="message assistant">
                     <div class="avatar">AI</div>
                     <div class="message-content">
-                        Hello! How can I help you today?
+                        Hello! I'm your AI teaching assistant. How can I help you today?
                     </div>
                 </div>
             </div>
@@ -241,14 +358,81 @@ You can update this section with your course materials, resources, or reference 
         </div>
     </div>
 
+    <!-- Modal for displaying content -->
+    <div class="modal" id="contentModal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal()">×</button>
+            <div class="markdown-content" id="modalContent"></div>
+        </div>
+    </div>
+
     <script>
         const chatContainer = document.getElementById('chatContainer');
         const messageInput = document.getElementById('messageInput');
         const sendButton = document.getElementById('sendButton');
+        
+        let conversationHistory = [];
 
-        // Add your API configuration here
-        const API_KEY = 'YOUR_API_KEY_HERE'; // Replace with your API key
-        const API_URL = 'https://api.anthropic.com/v1/messages'; // or your custom API endpoint
+        // Load materials and system prompt
+        let systemPromptContent = '';
+        let classMaterialsContent = '';
+
+        async function loadResources() {
+            try {
+                const [systemResponse, materialsResponse] = await Promise.all([
+                    fetch('/materials'),
+                    fetch('/materials')
+                ]);
+                
+                if (systemResponse.ok) {
+                    const data = await systemResponse.json();
+                    systemPromptContent = data.materials || 'System prompt not available';
+                }
+                
+                if (materialsResponse.ok) {
+                    const data = await materialsResponse.json();
+                    classMaterialsContent = data.materials || 'Class materials not available';
+                }
+            } catch (error) {
+                console.error('Error loading resources:', error);
+            }
+        }
+
+        // Show modal with markdown content
+        function showModal(type) {
+            const modal = document.getElementById('contentModal');
+            const modalContent = document.getElementById('modalContent');
+            
+            let content = '';
+            if (type === 'systemPrompt') {
+                content = systemPromptContent;
+            } else if (type === 'classMaterials') {
+                content = classMaterialsContent;
+            }
+            
+            // Render markdown
+            modalContent.innerHTML = marked.parse(content);
+            modal.classList.add('active');
+            
+            // Close on background click
+            modal.onclick = function(e) {
+                if (e.target === modal) {
+                    closeModal();
+                }
+            };
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('contentModal');
+            modal.classList.remove('active');
+        }
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
 
         function addMessage(content, isUser) {
             const messageDiv = document.createElement('div');
@@ -267,30 +451,8 @@ You can update this section with your course materials, resources, or reference 
             chatContainer.appendChild(messageDiv);
             
             chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-
-        function showLoading() {
-            const loadingDiv = document.createElement('div');
-            loadingDiv.className = 'message assistant loading';
-            loadingDiv.id = 'loading';
             
-            const avatar = document.createElement('div');
-            avatar.className = 'avatar';
-            avatar.textContent = 'AI';
-            
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'message-content';
-            contentDiv.textContent = 'Thinking...';
-            
-            loadingDiv.appendChild(avatar);
-            loadingDiv.appendChild(contentDiv);
-            chatContainer.appendChild(loadingDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-
-        function hideLoading() {
-            const loading = document.getElementById('loading');
-            if (loading) loading.remove();
+            return contentDiv;
         }
 
         async function sendMessage() {
@@ -298,45 +460,54 @@ You can update this section with your course materials, resources, or reference 
             if (!message) return;
 
             addMessage(message, true);
+            conversationHistory.push({role: 'user', content: message});
+            
             messageInput.value = '';
             sendButton.disabled = true;
-            showLoading();
+
+            const assistantDiv = addMessage('', false);
 
             try {
-                // MOCK RESPONSE - Replace this with actual API call
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                
-                // Example API call (uncomment and configure):
-                /*
-                const response = await fetch(API_URL, {
+                const response = await fetch('/chat', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-api-key': API_KEY,
-                        'anthropic-version': '2023-06-01'
-                    },
+                    headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        model: 'claude-3-sonnet-20240229',
-                        max_tokens: 1024,
-                        messages: [{
-                            role: 'user',
-                            content: message
-                        }]
+                        message: message,
+                        history: conversationHistory
                     })
                 });
-                
-                const data = await response.json();
-                const reply = data.content[0].text;
-                */
-                
-                // Mock response
-                const reply = `This is a mock response to: "${message}"\n\nTo enable real AI responses, configure your API key and endpoint in the JavaScript section.`;
-                
-                hideLoading();
-                addMessage(reply, false);
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullResponse = '';
+
+                while (true) {
+                    const {done, value} = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                if (data.content) {
+                                    fullResponse += data.content;
+                                    assistantDiv.textContent = fullResponse;
+                                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                                }
+                            } catch (e) {
+                                // Ignore parse errors
+                            }
+                        }
+                    }
+                }
+
+                conversationHistory.push({role: 'assistant', content: fullResponse});
+
             } catch (error) {
-                hideLoading();
-                addMessage('Sorry, there was an error processing your request.', false);
+                assistantDiv.textContent = 'Sorry, there was an error processing your request.';
                 console.error('Error:', error);
             } finally {
                 sendButton.disabled = false;
@@ -349,16 +520,9 @@ You can update this section with your course materials, resources, or reference 
             if (e.key === 'Enter') sendMessage();
         });
 
-        // Load custom content from localStorage if available
-        const savedSystemPrompt = localStorage.getItem('systemPrompt');
-        const savedClassMaterials = localStorage.getItem('classMaterials');
-        
-        if (savedSystemPrompt) {
-            document.getElementById('systemPrompt').textContent = savedSystemPrompt;
-        }
-        if (savedClassMaterials) {
-            document.getElementById('classMaterials').textContent = savedClassMaterials;
-        }
+        // Load resources on page load
+        loadResources();
     </script>
 </body>
 </html>
+EOF
