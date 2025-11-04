@@ -378,22 +378,27 @@
 
         async function loadResources() {
             try {
+                // Load from static files via nginx
                 const [systemResponse, materialsResponse] = await Promise.all([
-                    fetch('/materials'),
-                    fetch('/materials')
+                    fetch('/system_prompt.txt'),
+                    fetch('/class_materials.txt')
                 ]);
                 
                 if (systemResponse.ok) {
-                    const data = await systemResponse.json();
-                    systemPromptContent = data.materials || 'System prompt not available';
+                    systemPromptContent = await systemResponse.text();
+                } else {
+                    systemPromptContent = 'System prompt not available';
                 }
                 
                 if (materialsResponse.ok) {
-                    const data = await materialsResponse.json();
-                    classMaterialsContent = data.materials || 'Class materials not available';
+                    classMaterialsContent = await materialsResponse.text();
+                } else {
+                    classMaterialsContent = 'Class materials not available';
                 }
             } catch (error) {
                 console.error('Error loading resources:', error);
+                systemPromptContent = 'Error loading system prompt';
+                classMaterialsContent = 'Error loading class materials';
             }
         }
 
@@ -475,6 +480,10 @@
                         history: conversationHistory
                     })
                 });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
