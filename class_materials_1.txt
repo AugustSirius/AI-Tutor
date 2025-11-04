@@ -1,0 +1,63 @@
+# Mass Spectrometry Course Materials
+
+## Chapter 1: Fundamentals of Mass Spectrometry
+
+### 1.1 What is Mass Spectrometry?
+Mass spectrometry (MS) is an analytical technique that measures the mass-to-charge ratio (m/z) of ions. It's used to identify and quantify molecules in simple and complex mixtures.
+
+### 1.2 Basic Components
+1. Ion Source - converts molecules into ions
+2. Mass Analyzer - separates ions by m/z ratio
+3. Detector - records the abundance of each ion
+
+### 1.3 Key Concepts
+- Resolution (R): R = m/Δm
+- Sensitivity: Detection limit
+- Mass accuracy: ppm error
+
+## Chapter 2: Instrument Operation
+
+### 2.1 Sample Preparation
+- Dissolve sample in appropriate solvent
+- Filter to remove particles
+- Typical concentration: 1-10 μg/mL
+
+### 2.2 Startup Procedure
+1. Check vacuum system (< 10^-5 Torr)
+2. Warm up ion source (30 minutes)
+3. Calibrate mass axis
+4. Run blank sample
+
+### 2.3 Common Issues
+- Low signal: Check sample concentration
+- Peak broadening: Calibration needed
+- No signal: Check vacuum, ion source
+
+## Chapter 3: Data Analysis
+
+### 3.1 Interpreting Spectra
+- Base peak: Most abundant ion (100%)
+- Molecular ion: [M]+
+- Fragmentation patterns reveal structure
+
+### 3.2 Quantification
+- Use internal standards
+- Calibration curves (linear regression)
+- LOD and LOQ determination
+
+## FAQ
+
+Q: How to improve resolution?
+A: Use higher resolution analyzer, optimize ion source parameters
+
+Q: What causes baseline noise?
+A: Electronic noise, chemical background, poor vacuum
+
+Q: How often to calibrate?
+A: Daily for routine work, before each run for high accuracy
+
+## Safety Notes
+- Always wear PPE
+- Handle solvents in fume hood
+- Check gas cylinders regularly
+- Emergency shutdown: Red button on console

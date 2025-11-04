@@ -1,0 +1,13 @@
+# Mass Spectrometry Course Materials
+
+## Chapter 1: Fundamentals of Mass Spectrometry
+
+### 1.1 What is Mass Spectrometry?
+Mass spectrometry (MS) is an analytical technique that measures the mass-to-charge ratio (m/z) of ions. It's used to identify and quantify molecules in simple and complex mixtures.
+
+### 1.2 Basic Components
+1. Ion Source - converts molecules into ions
+2. Mass Analyzer - separates ions by m/z ratio
+3. Detector - records the abundance of each ion
+
+etc...

@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chat - aidamcell.com</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f9f9f9;
+            color: #2c2c2c;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: 300px;
+            background: white;
+            border-right: 1px solid #e5e5e5;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .sidebar h3 {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .sidebar-section {
+            margin-bottom: 30px;
+        }
+
+        .sidebar-content {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: white;
+        }
+
+        .header {
+            padding: 20px 30px;
+            border-bottom: 1px solid #e5e5e5;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 30px;
+        }
+
+        .message {
+            margin-bottom: 25px;
+            display: flex;
+            gap: 15px;
+        }
+
+        .message.user {
+            flex-direction: row-reverse;
+        }
+
+        .avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .message.user .avatar {
+            background: #2c2c2c;
+            color: white;
+        }
+
+        .message.assistant .avatar {
+            background: #e5e5e5;
+            color: #2c2c2c;
+        }
+
+        .message-content {
+            max-width: 70%;
+            line-height: 1.6;
+        }
+
+        .message.user .message-content {
+            background: #2c2c2c;
+            color: white;
+            padding: 12px 16px;
+            border-radius: 18px;
+        }
+
+        .message.assistant .message-content {
+            padding: 12px 0;
+        }
+
+        .input-container {
+            padding: 20px 30px;
+            border-top: 1px solid #e5e5e5;
+        }
+
+        .input-wrapper {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            background: #f5f5f5;
+            border-radius: 24px;
+            padding: 10px 20px;
+        }
+
+        .input-wrapper:focus-within {
+            background: #ebebeb;
+        }
+
+        #messageInput {
+            flex: 1;
+            border: none;
+            background: transparent;
+            font-size: 15px;
+            outline: none;
+            font-family: inherit;
+        }
+
+        #sendButton {
+            background: #2c2c2c;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 16px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        #sendButton:hover {
+            background: #1a1a1a;
+        }
+
+        #sendButton:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            display: none;
+            padding: 12px 0;
+            color: #666;
+            font-style: italic;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                display: none;
+            }
+            
+            .message-content {
+                max-width: 85%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="sidebar-section">
+                <h3>System Prompt</h3>
+                <div class="sidebar-content" id="systemPrompt">
+You are a helpful AI assistant. You provide clear, accurate, and thoughtful responses to user questions.
+                </div>
+            </div>
+            
+            <div class="sidebar-section">
+                <h3>Class Materials</h3>
+                <div class="sidebar-content" id="classMaterials">
+No class materials loaded yet.
+
+You can update this section with your course materials, resources, or reference documents.
+                </div>
+            </div>
+        </div>
+
+        <div class="main">
+            <div class="header">
+                <h1>AI Chat</h1>
+            </div>
+
+            <div class="chat-container" id="chatContainer">
+                <div class="message assistant">
+                    <div class="avatar">AI</div>
+                    <div class="message-content">
+                        Hello! How can I help you today?
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-container">
+                <div class="input-wrapper">
+                    <input 
+                        type="text" 
+                        id="messageInput" 
+                        placeholder="Type your message..."
+                        autocomplete="off"
+                    />
+                    <button id="sendButton">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const chatContainer = document.getElementById('chatContainer');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+
+        // Add your API configuration here
+        const API_KEY = 'YOUR_API_KEY_HERE'; // Replace with your API key
+        const API_URL = 'https://api.anthropic.com/v1/messages'; // or your custom API endpoint
+
+        function addMessage(content, isUser) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'assistant'}`;
+            
+            const avatar = document.createElement('div');
+            avatar.className = 'avatar';
+            avatar.textContent = isUser ? 'U' : 'AI';
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.textContent = content;
+            
+            messageDiv.appendChild(avatar);
+            messageDiv.appendChild(contentDiv);
+            chatContainer.appendChild(messageDiv);
+            
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function showLoading() {
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'message assistant loading';
+            loadingDiv.id = 'loading';
+            
+            const avatar = document.createElement('div');
+            avatar.className = 'avatar';
+            avatar.textContent = 'AI';
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.textContent = 'Thinking...';
+            
+            loadingDiv.appendChild(avatar);
+            loadingDiv.appendChild(contentDiv);
+            chatContainer.appendChild(loadingDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function hideLoading() {
+            const loading = document.getElementById('loading');
+            if (loading) loading.remove();
+        }
+
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            addMessage(message, true);
+            messageInput.value = '';
+            sendButton.disabled = true;
+            showLoading();
+
+            try {
+                // MOCK RESPONSE - Replace this with actual API call
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Example API call (uncomment and configure):
+                /*
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': API_KEY,
+                        'anthropic-version': '2023-06-01'
+                    },
+                    body: JSON.stringify({
+                        model: 'claude-3-sonnet-20240229',
+                        max_tokens: 1024,
+                        messages: [{
+                            role: 'user',
+                            content: message
+                        }]
+                    })
+                });
+                
+                const data = await response.json();
+                const reply = data.content[0].text;
+                */
+                
+                // Mock response
+                const reply = `This is a mock response to: "${message}"\n\nTo enable real AI responses, configure your API key and endpoint in the JavaScript section.`;
+                
+                hideLoading();
+                addMessage(reply, false);
+            } catch (error) {
+                hideLoading();
+                addMessage('Sorry, there was an error processing your request.', false);
+                console.error('Error:', error);
+            } finally {
+                sendButton.disabled = false;
+                messageInput.focus();
+            }
+        }
+
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        // Load custom content from localStorage if available
+        const savedSystemPrompt = localStorage.getItem('systemPrompt');
+        const savedClassMaterials = localStorage.getItem('classMaterials');
+        
+        if (savedSystemPrompt) {
+            document.getElementById('systemPrompt').textContent = savedSystemPrompt;
+        }
+        if (savedClassMaterials) {
+            document.getElementById('classMaterials').textContent = savedClassMaterials;
+        }
+    </script>
+</body>
+</html>
