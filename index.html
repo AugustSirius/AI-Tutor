@@ -489,35 +489,67 @@
             return contentDiv;
         }
 
-        async function sendMessage() {
+        async function sendMessage(isRetry = false) {
             const message = messageInput.value.trim();
-            if (!message) return;
-            addMessage(message, true);
-            conversationHistory.push({role: 'user', content: message});
-            messageInput.value = '';
+            if (!message && !isRetry) return;
+            
+            // Get message from input or last history item (for retry)
+            const currentMessage = isRetry ? conversationHistory[conversationHistory.length - 1].content : message;
+            
+            if (!isRetry) {
+                addMessage(currentMessage, true);
+                conversationHistory.push({role: 'user', content: currentMessage});
+                messageInput.value = '';
+            }
+            
             sendButton.disabled = true;
             const assistantDiv = addMessage('', false);
+            
+            // Show loading indicator
+            assistantDiv.innerHTML = '<p style="color: #999;">💬 Sending...</p>';
+            
             let fullResponse = '';
             let thinkingBlock = null;
             let hasThinking = false;
+            
+            // Timeout detection
+            let hasReceivedData = false;
+            let retryTimeout = null;
             
             try {
                 const response = await fetch('/chat', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        message: message,
-                        history: conversationHistory,
+                        message: currentMessage,
+                        history: isRetry ? conversationHistory.slice(0, -1) : conversationHistory,
                         session_id: sessionId
                     })
                 });
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                
+                // Set timeout for no response
+                retryTimeout = setTimeout(() => {
+                    if (!hasReceivedData && !isRetry) {
+                        console.log('No response in 5s, auto-retrying...');
+                        assistantDiv.innerHTML = '<p style="color: #ff9800;">⏱️ Retrying...</p>';
+                        sendMessage(true); // Auto-retry once
+                    }
+                }, 5000); // 5 seconds
+                
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 
                 while (true) {
                     const {done, value} = await reader.read();
                     if (done) break;
+                    
+                    hasReceivedData = true; // Got data, cancel retry
+                    if (retryTimeout) {
+                        clearTimeout(retryTimeout);
+                        retryTimeout = null;
+                    }
+                    
                     const chunk = decoder.decode(value);
                     const lines = chunk.split('\n');
                     
@@ -580,9 +612,18 @@
                 }
                 conversationHistory.push({role: 'assistant', content: fullResponse});
             } catch (error) {
-                assistantDiv.innerHTML = '<p style="color: red;">Sorry, there was an error processing your request.</p>';
+                if (retryTimeout) clearTimeout(retryTimeout);
+                if (!isRetry) {
+                    // Show error and retry
+                    assistantDiv.innerHTML = '<p style="color: #ff9800;">⚠️ Connection issue, retrying...</p>';
+                    setTimeout(() => sendMessage(true), 2000);
+                } else {
+                    // Already retried, show error
+                    assistantDiv.innerHTML = '<p style="color: red;">❌ Sorry, connection failed. Please try again.</p>';
+                }
                 console.error('Error:', error);
             } finally {
+                if (retryTimeout) clearTimeout(retryTimeout);
                 sendButton.disabled = false;
                 messageInput.focus();
             }

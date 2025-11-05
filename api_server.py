@@ -23,7 +23,7 @@ PRICE_CACHE_WRITE = 0.03
 PRICE_CACHE_READ = 0.03
 PRICE_CACHE_STORAGE = 1.00
 
-client = openai.OpenAI(api_key=POE_API_KEY, base_url=BASE_URL)
+client = openai.OpenAI(api_key=POE_API_KEY, base_url=BASE_URL, timeout=30.0)
 
 # Try to import tiktoken
 try:
@@ -116,11 +116,14 @@ def chat():
     
     def generate():
         try:
+            # Send initial heartbeat
+            yield f"data: {json.dumps({'type': 'start'})}\n\n"
+            
             stream = client.chat.completions.create(
                 model=MODEL,
                 messages=messages,
                 temperature=0.7,
-                max_tokens=8000,  # Increased from 2000
+                max_tokens=8000,
                 stream=True
             )
             
@@ -204,7 +207,9 @@ def chat():
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
             
         except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+            error_msg = f"Error: {str(e)}"
+            print(f"❌ {error_msg}")
+            yield f"data: {json.dumps({'type': 'error', 'content': error_msg})}\n\n"
     
     return Response(generate(), mimetype='text/event-stream')
 
