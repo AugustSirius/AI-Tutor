@@ -152,7 +152,8 @@ cat 课件.txt 实验手册.txt 参考文献.txt > class_materials.txt
 **3. 重启服务** (1分钟)
 ```bash
 pkill -f api_server.py
-nohup python3 api_server.py > api.log 2>&1 &
+nohup python3 api_server.py > api.log 2>&1 
+sudo systemctl restart nginx
 ```
 
 ### 可应用课程示例：

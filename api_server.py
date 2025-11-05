@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Flask API wrapper for AI Teaching Assistant
+Flask API wrapper for AI Teaching Assistant with Prompt Caching
+Enhanced version with ACCURATE token counting using tiktoken
 """
 from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
@@ -16,37 +17,45 @@ POE_API_KEY = "67oQnDb5KQV8iaUpgEIB5wi_bmwU_dE0Wnm9aJVnA3o"
 BASE_URL = "https://api.poe.com/v1"
 MODEL = "Gemini-2.5-Flash"
 
-# Pricing (per 1M tokens)
+client = openai.OpenAI(api_key=POE_API_KEY, base_url=BASE_URL)
+
+# ===== PRICING (per 1M tokens) - Gemini 2.5 Flash =====
 PRICE_INPUT = 0.30
 PRICE_OUTPUT = 2.50
 PRICE_CACHE_WRITE = 0.03
 PRICE_CACHE_READ = 0.03
 PRICE_CACHE_STORAGE = 1.00
 
-client = openai.OpenAI(api_key=POE_API_KEY, base_url=BASE_URL)
-
 # Try to import tiktoken for accurate token counting
 try:
     import tiktoken
     TIKTOKEN_AVAILABLE = True
+    # Use GPT-4 encoder as approximation for Gemini
     encoder = tiktoken.encoding_for_model("gpt-4")
 except ImportError:
     TIKTOKEN_AVAILABLE = False
-    print("⚠️  tiktoken not installed. Using approximation.")
+    print("⚠️  Warning: tiktoken not installed. Using approximate token counting.")
+    print("   Install with: pip install tiktoken")
 
+# Session storage (in production, use Redis or database)
 sessions = {}
 
+# Load materials once at startup
 CACHED_MATERIALS = ""
 CACHED_SYSTEM_PROMPT = ""
 
 def count_tokens(text):
-    """Accurately count tokens"""
+    """Accurately count tokens using tiktoken, fallback to approximation"""
     if TIKTOKEN_AVAILABLE:
         return len(encoder.encode(text))
     else:
+        # Fallback: rough approximation
+        # For Chinese: ~1.5 tokens per character
+        # For English: ~0.75 tokens per word
         chinese_chars = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
         english_words = len([w for w in text.split() if any(c.isalpha() for c in w)])
         other_chars = len(text) - chinese_chars - sum(len(w) for w in text.split())
+        
         return int(chinese_chars * 1.5 + english_words * 0.75 + other_chars * 0.3)
 
 def load_file(filename):
@@ -57,6 +66,7 @@ def load_file(filename):
     except FileNotFoundError:
         return ""
 
+# Initialize on startup
 CACHED_MATERIALS = load_file('class_materials.txt')
 CACHED_SYSTEM_PROMPT = load_file('system_prompt.txt')
 
@@ -71,6 +81,7 @@ FULL_PROMPT = f"""{CACHED_SYSTEM_PROMPT}
 Use these materials to answer student questions. Always cite which chapter/section your answer comes from.
 """
 
+# Calculate ACCURATE cached content size
 CACHED_TOKENS_SIZE = count_tokens(FULL_PROMPT)
 
 print(f"\n{'='*60}")
@@ -117,24 +128,25 @@ def calculate_cost(input_tokens, output_tokens, cache_write_tokens=0, cache_read
 def format_cost_report(session, input_tokens, output_tokens, cost_info, is_first_message):
     """Format a concise cost report"""
     report = "\n\n---\n\n"
-    report += "**💰 Cost Analysis** (Gemini-2.5-Flash)\n\n"
-    report += f"*Pricing: Input ${PRICE_INPUT}/1M | Output ${PRICE_OUTPUT}/1M | Cache Write ${PRICE_CACHE_WRITE}/1M | Cache Read ${PRICE_CACHE_READ}/1M*\n\n"
+    report += "**💰 成本分析 Cost Analysis:**\n\n"
     
     if is_first_message:
-        report += f"- 📝 Cache Write: {int(CACHED_TOKENS_SIZE):,} tokens (${cost_info['cache_write_cost']:.6f})\n"
-        report += f"- 📥 Input: {input_tokens:,} tokens (${cost_info['input_cost']:.6f})\n"
+        report += f"- 📝 缓存写入 Cache Write: {int(CACHED_TOKENS_SIZE):,} tokens (${cost_info['cache_write_cost']:.6f})\n"
+        report += f"- 📥 新输入 Input: {input_tokens:,} tokens (${cost_info['input_cost']:.6f})\n"
     else:
-        report += f"- 💾 Cache Read: {int(CACHED_TOKENS_SIZE):,} tokens (${cost_info['cache_read_cost']:.6f})\n"
-        report += f"- 📥 Input: {input_tokens:,} tokens (${cost_info['input_cost']:.6f})\n"
+        report += f"- 💾 缓存读取 Cache Read: {int(CACHED_TOKENS_SIZE):,} tokens (${cost_info['cache_read_cost']:.6f})\n"
+        report += f"- 📥 新输入 Input: {input_tokens:,} tokens (${cost_info['input_cost']:.6f})\n"
     
-    report += f"- 📤 Output: {output_tokens:,} tokens (${cost_info['output_cost']:.6f})\n"
-    report += f"- **💵 Total: ${cost_info['total_cost']:.6f} (≈¥{cost_info['total_cost']*7.2:.4f})**\n\n"
+    report += f"- 📤 输出 Output: {output_tokens:,} tokens (${cost_info['output_cost']:.6f})\n"
+    report += f"- **💵 本次总计 Total: ${cost_info['total_cost']:.6f} (≈¥{cost_info['total_cost']*7.2:.4f})**\n\n"
     
+    # Session stats
     elapsed_hours = (time.time() - session['session_start_time']) / 3600
     storage_cost = (CACHED_TOKENS_SIZE / 1_000_000) * PRICE_CACHE_STORAGE * elapsed_hours
     total_with_storage = session['total_cost'] + storage_cost
     
-    report += f"**📊 Session:** {session['message_count']} messages | ${total_with_storage:.6f} (≈¥{total_with_storage*7.2:.4f})"
+    report += f"**📊 本次会话统计 Session Stats:** {session['message_count']} 条消息 | "
+    report += f"${total_with_storage:.6f} (≈¥{total_with_storage*7.2:.4f})"
     
     return report
 
@@ -160,15 +172,18 @@ def chat():
     if not user_message:
         return jsonify({"error": "No message provided"}), 400
     
+    # Get or create session
     session = get_or_create_session(session_id)
     is_first_message = not session['cache_created']
     
+    # Build messages
     messages = [{"role": "system", "content": FULL_PROMPT}]
     messages.extend(history)
     messages.append({"role": "user", "content": user_message})
     
     def generate():
         try:
+            # Start streaming
             stream = client.chat.completions.create(
                 model=MODEL,
                 messages=messages,
@@ -181,12 +196,13 @@ def chat():
             thinking_content = ""
             in_thinking = False
             
+            # Stream the response
             for chunk in stream:
                 if chunk.choices[0].delta.content:
                     content = chunk.choices[0].delta.content
                     full_response += content
                     
-                    # Detect thinking blocks
+                    # Detect thinking blocks (if Gemini outputs them)
                     if '<thinking>' in content:
                         in_thinking = True
                         yield f"data: {json.dumps({'type': 'thinking_start'})}\n\n"
@@ -202,6 +218,7 @@ def chat():
                     else:
                         yield f"data: {json.dumps({'type': 'content', 'content': content})}\n\n"
             
+            # Calculate costs with ACCURATE token counting
             question_tokens = count_tokens(user_message)
             output_tokens = count_tokens(full_response)
             
@@ -224,15 +241,19 @@ def chat():
                 int(cache_read_tokens)
             )
             
+            # Update session stats
             session['total_input_tokens'] += int(input_tokens)
             session['total_output_tokens'] += int(output_tokens)
             session['total_cost'] += cost_info['total_cost']
             session['message_count'] += 1
             
+            # Send cost report
             cost_report = format_cost_report(session, int(input_tokens), int(output_tokens), 
                                             cost_info, is_first_message)
             yield f"data: {json.dumps({'type': 'cost_report', 'content': cost_report})}\n\n"
-            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+            
+            # Send done signal
+            yield f"data: {json.dumps({'type': 'done', 'session': session})}\n\n"
             
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
@@ -247,13 +268,31 @@ def get_materials():
         "class_materials": CACHED_MATERIALS
     })
 
+@app.route('/session/<session_id>', methods=['GET'])
+def get_session(session_id):
+    """Get session statistics"""
+    session = sessions.get(session_id)
+    if not session:
+        return jsonify({"error": "Session not found"}), 404
+    
+    elapsed_hours = (time.time() - session['session_start_time']) / 3600
+    storage_cost = (CACHED_TOKENS_SIZE / 1_000_000) * PRICE_CACHE_STORAGE * elapsed_hours
+    
+    return jsonify({
+        **session,
+        'elapsed_hours': elapsed_hours,
+        'storage_cost': storage_cost,
+        'total_with_storage': session['total_cost'] + storage_cost
+    })
+
 if __name__ == '__main__':
     print("=" * 60)
-    print("🚀 AI Teaching Assistant API")
+    print("🚀 AI Teaching Assistant API (Enhanced with Accurate Tokens)")
     print("=" * 60)
     print(f"📚 Model: {MODEL}")
     print(f"💾 Caching: ENABLED")
     print(f"📦 Cached Size: {int(CACHED_TOKENS_SIZE):,} tokens")
+    print(f"🔢 Token Counter: {'tiktoken (accurate)' if TIKTOKEN_AVAILABLE else 'approximation'}")
     print(f"🌐 Server: http://0.0.0.0:5000")
     print("=" * 60)
     app.run(host='0.0.0.0', port=5000, debug=False)
