@@ -221,6 +221,23 @@
             font-weight: 600;
         }
 
+        .message-content table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 12px 0;
+        }
+
+        .message-content th, .message-content td {
+            border: 1px solid #e5e5e5;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .message-content th {
+            background: #f5f5f5;
+            font-weight: 600;
+        }
+
         /* Thinking block */
         .thinking-block {
             background: #f8f9fa;
@@ -367,6 +384,57 @@
             margin: 20px 0 12px;
         }
 
+        .markdown-content p {
+            margin: 12px 0;
+        }
+
+        .markdown-content ul, .markdown-content ol {
+            margin: 12px 0;
+            padding-left: 30px;
+        }
+
+        .markdown-content li {
+            margin: 8px 0;
+        }
+
+        .markdown-content code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+
+        .markdown-content pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+
+        .markdown-content pre code {
+            background: none;
+            padding: 0;
+        }
+
+        .markdown-content table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 15px 0;
+        }
+
+        .markdown-content th, .markdown-content td {
+            border: 1px solid #e5e5e5;
+            padding: 12px;
+            text-align: left;
+        }
+
+        .markdown-content th {
+            background: #f5f5f5;
+            font-weight: 600;
+        }
+
         @media (max-width: 768px) {
             .sidebar {
                 display: none;
@@ -374,6 +442,11 @@
             
             .message-content {
                 max-width: 85%;
+            }
+
+            .modal-content {
+                margin: 20px;
+                padding: 20px;
             }
         }
     </style>
@@ -392,6 +465,25 @@
                 <div class="sidebar-item" onclick="showModal('classMaterials')">
                     <span class="sidebar-item-title">Class Materials</span>
                     <span class="sidebar-item-icon">→</span>
+                </div>
+            </div>
+            
+            <div class="sidebar-section">
+                <h3>About Project</h3>
+                
+                <div class="sidebar-item" onclick="showModal('projectPlanShort')">
+                    <span class="sidebar-item-title">课程助教方案（精简版）</span>
+                    <span class="sidebar-item-icon">📋</span>
+                </div>
+                
+                <div class="sidebar-item" onclick="showModal('projectPlanFull')">
+                    <span class="sidebar-item-title">课程助教方案（完整版）</span>
+                    <span class="sidebar-item-icon">📄</span>
+                </div>
+                
+                <div class="sidebar-item" onclick="showModal('costVerification')">
+                    <span class="sidebar-item-title">成本验证</span>
+                    <span class="sidebar-item-icon">💰</span>
                 </div>
             </div>
             
@@ -451,32 +543,47 @@
         let conversationHistory = [];
         let sessionId = 'session_' + Date.now();
 
-        // Load materials and system prompt
+        // Load all resources
         let systemPromptContent = '';
         let classMaterialsContent = '';
+        let projectPlanShortContent = '';
+        let projectPlanFullContent = '';
+        let costVerificationContent = '';
 
         async function loadResources() {
             try {
+                // Load existing resources
                 const [systemResponse, materialsResponse] = await Promise.all([
                     fetch('/system_prompt.txt'),
                     fetch('/class_materials.txt')
                 ]);
                 
-                if (systemResponse.ok) {
-                    systemPromptContent = await systemResponse.text();
-                } else {
-                    systemPromptContent = 'System prompt not available';
+                systemPromptContent = systemResponse.ok ? await systemResponse.text() : 'System prompt not available';
+                classMaterialsContent = materialsResponse.ok ? await materialsResponse.text() : 'Class materials not available';
+                
+                // Load project documents (these may not exist yet)
+                try {
+                    const planShortResponse = await fetch('/AI课程助教方案-精简版.md');
+                    projectPlanShortContent = planShortResponse.ok ? await planShortResponse.text() : '# AI 课程助教方案（精简版）\n\n暂无内容';
+                } catch (e) {
+                    projectPlanShortContent = '# AI 课程助教方案（精简版）\n\n暂无内容';
                 }
                 
-                if (materialsResponse.ok) {
-                    classMaterialsContent = await materialsResponse.text();
-                } else {
-                    classMaterialsContent = 'Class materials not available';
+                try {
+                    const planFullResponse = await fetch('/AI课程助教方案.md');
+                    projectPlanFullContent = planFullResponse.ok ? await planFullResponse.text() : '# AI 课程助教方案（完整版）\n\n暂无内容';
+                } catch (e) {
+                    projectPlanFullContent = '# AI 课程助教方案（完整版）\n\n暂无内容';
+                }
+                
+                try {
+                    const costResponse = await fetch('/成本验证.md');
+                    costVerificationContent = costResponse.ok ? await costResponse.text() : '# 成本验证\n\n暂无内容';
+                } catch (e) {
+                    costVerificationContent = '# 成本验证\n\n暂无内容';
                 }
             } catch (error) {
                 console.error('Error loading resources:', error);
-                systemPromptContent = 'Error loading system prompt';
-                classMaterialsContent = 'Error loading class materials';
             }
         }
 
@@ -484,7 +591,8 @@
             try {
                 const response = await fetch('/health');
                 const data = await response.json();
-                alert(`✅ System Status:\n\nModel: ${data.model}\nCaching: ${data.caching_enabled ? 'Enabled' : 'Disabled'}\nCached Size: ${data.cached_size.toLocaleString()} tokens`);
+                const tiktokenStatus = data.tiktoken_available ? '✅ tiktoken (accurate)' : '⚠️ approximation';
+                alert(`✅ System Status:\n\nModel: ${data.model}\nCaching: ${data.caching_enabled ? 'Enabled ✅' : 'Disabled ❌'}\nCached Size: ${data.cached_size.toLocaleString()} tokens\nToken Counter: ${tiktokenStatus}`);
             } catch (error) {
                 alert('❌ Failed to check system status');
             }
@@ -499,6 +607,12 @@
                 content = systemPromptContent;
             } else if (type === 'classMaterials') {
                 content = classMaterialsContent;
+            } else if (type === 'projectPlanShort') {
+                content = projectPlanShortContent;
+            } else if (type === 'projectPlanFull') {
+                content = projectPlanFullContent;
+            } else if (type === 'costVerification') {
+                content = costVerificationContent;
             }
             
             modalContent.innerHTML = marked.parse(content);
@@ -536,7 +650,6 @@
             if (isUser) {
                 contentDiv.textContent = content;
             } else {
-                // For assistant, leave empty initially for streaming
                 contentDiv.innerHTML = '';
             }
             
@@ -608,12 +721,10 @@
                                 }
                                 else if (data.type === 'content') {
                                     fullResponse += data.content;
-                                    // Render as markdown
                                     assistantDiv.innerHTML = marked.parse(fullResponse);
                                     chatContainer.scrollTop = chatContainer.scrollHeight;
                                 }
                                 else if (data.type === 'cost_report') {
-                                    // Append cost report as markdown
                                     const costDiv = document.createElement('div');
                                     costDiv.className = 'cost-report';
                                     costDiv.innerHTML = marked.parse(data.content);
