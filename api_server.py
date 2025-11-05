@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Flask API wrapper for AI Teaching Assistant with Model Switching
+Flask API wrapper for AI Teaching Assistant
 """
 from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
@@ -14,29 +14,14 @@ CORS(app)
 # ============ CONFIGURATION ============
 POE_API_KEY = "67oQnDb5KQV8iaUpgEIB5wi_bmwU_dE0Wnm9aJVnA3o"
 BASE_URL = "https://api.poe.com/v1"
+MODEL = "Gemini-2.5-Flash"
 
-# Model configurations
-MODELS = {
-    "flash": {
-        "name": "Gemini-2.5-Flash",
-        "price_input": 0.30,
-        "price_output": 2.50,
-        "price_cache_write": 0.03,
-        "price_cache_read": 0.03,
-        "price_cache_storage": 1.00
-    },
-    "pro": {
-        "name": "Gemini-2.5-Pro",
-        "price_input": 1.25,
-        "price_output": 10.00,
-        "price_cache_write": 0.125,
-        "price_cache_read": 0.125,
-        "price_cache_storage": 4.50
-    }
-}
-
-# Default model
-current_model = "flash"
+# Pricing (per 1M tokens)
+PRICE_INPUT = 0.30
+PRICE_OUTPUT = 2.50
+PRICE_CACHE_WRITE = 0.03
+PRICE_CACHE_READ = 0.03
+PRICE_CACHE_STORAGE = 1.00
 
 client = openai.OpenAI(api_key=POE_API_KEY, base_url=BASE_URL)
 
@@ -49,10 +34,8 @@ except ImportError:
     TIKTOKEN_AVAILABLE = False
     print("⚠️  tiktoken not installed. Using approximation.")
 
-# Session storage
 sessions = {}
 
-# Load materials once at startup
 CACHED_MATERIALS = ""
 CACHED_SYSTEM_PROMPT = ""
 
@@ -74,7 +57,6 @@ def load_file(filename):
     except FileNotFoundError:
         return ""
 
-# Initialize on startup
 CACHED_MATERIALS = load_file('class_materials.txt')
 CACHED_SYSTEM_PROMPT = load_file('system_prompt.txt')
 
@@ -111,18 +93,16 @@ def get_or_create_session(session_id):
             'total_cache_write_tokens': 0,
             'total_cache_read_tokens': 0,
             'total_cost': 0.0,
-            'message_count': 0,
-            'model': current_model
+            'message_count': 0
         }
     return sessions[session_id]
 
-def calculate_cost(input_tokens, output_tokens, cache_write_tokens=0, cache_read_tokens=0, model="flash"):
+def calculate_cost(input_tokens, output_tokens, cache_write_tokens=0, cache_read_tokens=0):
     """Calculate cost based on token usage with caching"""
-    prices = MODELS[model]
-    input_cost = (input_tokens / 1_000_000) * prices["price_input"]
-    output_cost = (output_tokens / 1_000_000) * prices["price_output"]
-    cache_write_cost = (cache_write_tokens / 1_000_000) * prices["price_cache_write"]
-    cache_read_cost = (cache_read_tokens / 1_000_000) * prices["price_cache_read"]
+    input_cost = (input_tokens / 1_000_000) * PRICE_INPUT
+    output_cost = (output_tokens / 1_000_000) * PRICE_OUTPUT
+    cache_write_cost = (cache_write_tokens / 1_000_000) * PRICE_CACHE_WRITE
+    cache_read_cost = (cache_read_tokens / 1_000_000) * PRICE_CACHE_READ
     
     total_cost = input_cost + output_cost + cache_write_cost + cache_read_cost
     
@@ -134,12 +114,11 @@ def calculate_cost(input_tokens, output_tokens, cache_write_tokens=0, cache_read
         'total_cost': total_cost
     }
 
-def format_cost_report(session, input_tokens, output_tokens, cost_info, is_first_message, model="flash"):
+def format_cost_report(session, input_tokens, output_tokens, cost_info, is_first_message):
     """Format a concise cost report"""
-    prices = MODELS[model]
     report = "\n\n---\n\n"
-    report += f"**💰 Cost Analysis** (Model: {MODELS[model]['name']})\n\n"
-    report += f"*Pricing: Input ${prices['price_input']}/1M, Output ${prices['price_output']}/1M, Cache Write ${prices['price_cache_write']}/1M, Cache Read ${prices['price_cache_read']}/1M*\n\n"
+    report += "**💰 Cost Analysis** (Gemini-2.5-Flash)\n\n"
+    report += f"*Pricing: Input ${PRICE_INPUT}/1M | Output ${PRICE_OUTPUT}/1M | Cache Write ${PRICE_CACHE_WRITE}/1M | Cache Read ${PRICE_CACHE_READ}/1M*\n\n"
     
     if is_first_message:
         report += f"- 📝 Cache Write: {int(CACHED_TOKENS_SIZE):,} tokens (${cost_info['cache_write_cost']:.6f})\n"
@@ -152,7 +131,7 @@ def format_cost_report(session, input_tokens, output_tokens, cost_info, is_first
     report += f"- **💵 Total: ${cost_info['total_cost']:.6f} (≈¥{cost_info['total_cost']*7.2:.4f})**\n\n"
     
     elapsed_hours = (time.time() - session['session_start_time']) / 3600
-    storage_cost = (CACHED_TOKENS_SIZE / 1_000_000) * prices["price_cache_storage"] * elapsed_hours
+    storage_cost = (CACHED_TOKENS_SIZE / 1_000_000) * PRICE_CACHE_STORAGE * elapsed_hours
     total_with_storage = session['total_cost'] + storage_cost
     
     report += f"**📊 Session:** {session['message_count']} messages | ${total_with_storage:.6f} (≈¥{total_with_storage*7.2:.4f})"
@@ -164,30 +143,11 @@ def health():
     """Health check endpoint"""
     return jsonify({
         "status": "ok", 
-        "model": MODELS[current_model]["name"],
+        "model": MODEL,
         "caching_enabled": True,
         "cached_size": int(CACHED_TOKENS_SIZE),
         "tiktoken_available": TIKTOKEN_AVAILABLE
     })
-
-@app.route('/models', methods=['GET'])
-def get_models():
-    """Get available models and current model"""
-    return jsonify({
-        "current": current_model,
-        "available": MODELS
-    })
-
-@app.route('/model', methods=['POST'])
-def set_model():
-    """Switch model"""
-    global current_model
-    data = request.json
-    model = data.get('model', 'flash')
-    if model in MODELS:
-        current_model = model
-        return jsonify({"success": True, "model": current_model})
-    return jsonify({"success": False, "error": "Invalid model"}), 400
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -201,7 +161,6 @@ def chat():
         return jsonify({"error": "No message provided"}), 400
     
     session = get_or_create_session(session_id)
-    session['model'] = current_model
     is_first_message = not session['cache_created']
     
     messages = [{"role": "system", "content": FULL_PROMPT}]
@@ -211,7 +170,7 @@ def chat():
     def generate():
         try:
             stream = client.chat.completions.create(
-                model=MODELS[current_model]["name"],
+                model=MODEL,
                 messages=messages,
                 temperature=0.7,
                 max_tokens=2000,
@@ -219,12 +178,29 @@ def chat():
             )
             
             full_response = ""
+            thinking_content = ""
+            in_thinking = False
             
             for chunk in stream:
                 if chunk.choices[0].delta.content:
                     content = chunk.choices[0].delta.content
                     full_response += content
-                    yield f"data: {json.dumps({'type': 'content', 'content': content})}\n\n"
+                    
+                    # Detect thinking blocks
+                    if '<thinking>' in content:
+                        in_thinking = True
+                        yield f"data: {json.dumps({'type': 'thinking_start'})}\n\n"
+                    
+                    if in_thinking:
+                        thinking_content += content
+                        if '</thinking>' in content:
+                            in_thinking = False
+                            yield f"data: {json.dumps({'type': 'thinking_end', 'content': thinking_content})}\n\n"
+                            thinking_content = ""
+                        else:
+                            yield f"data: {json.dumps({'type': 'thinking', 'content': content})}\n\n"
+                    else:
+                        yield f"data: {json.dumps({'type': 'content', 'content': content})}\n\n"
             
             question_tokens = count_tokens(user_message)
             output_tokens = count_tokens(full_response)
@@ -245,8 +221,7 @@ def chat():
                 int(input_tokens),
                 int(output_tokens),
                 int(cache_write_tokens),
-                int(cache_read_tokens),
-                current_model
+                int(cache_read_tokens)
             )
             
             session['total_input_tokens'] += int(input_tokens)
@@ -255,9 +230,9 @@ def chat():
             session['message_count'] += 1
             
             cost_report = format_cost_report(session, int(input_tokens), int(output_tokens), 
-                                            cost_info, is_first_message, current_model)
+                                            cost_info, is_first_message)
             yield f"data: {json.dumps({'type': 'cost_report', 'content': cost_report})}\n\n"
-            yield f"data: {json.dumps({'type': 'done', 'session': session})}\n\n"
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
             
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
@@ -276,7 +251,7 @@ if __name__ == '__main__':
     print("=" * 60)
     print("🚀 AI Teaching Assistant API")
     print("=" * 60)
-    print(f"📚 Model: {MODELS[current_model]['name']}")
+    print(f"📚 Model: {MODEL}")
     print(f"💾 Caching: ENABLED")
     print(f"📦 Cached Size: {int(CACHED_TOKENS_SIZE):,} tokens")
     print(f"🌐 Server: http://0.0.0.0:5000")
