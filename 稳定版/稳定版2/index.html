@@ -124,87 +124,28 @@
         }
         .message-content th { background: #f5f5f5; font-weight: 600; }
         
-        /* Enhanced thinking block styling with clear separation */
+        /* Thinking block styling */
         .thinking-block {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            padding: 18px 22px;
-            margin: 24px 0;
-            border-radius: 12px;
-            font-size: 13px;
-            color: white;
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25);
-            position: relative;
-        }
-        
-        .thinking-block::before {
-            content: '';
-            position: absolute;
-            top: -12px;
-            left: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 4px 12px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-left: 4px solid #6c757d;
+            padding: 12px 16px;
+            margin: 16px 0;
             border-radius: 6px;
-            font-size: 10px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
+            font-size: 13px;
+            color: #495057;
         }
-        
         .thinking-label {
             font-weight: 700;
-            font-size: 12px;
+            font-size: 11px;
             text-transform: uppercase;
-            color: rgba(255, 255, 255, 0.95);
-            margin-bottom: 12px;
-            letter-spacing: 1px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            color: #6c757d;
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
         }
-        
-        .thinking-label::before {
-            content: '🧠';
-            font-size: 18px;
-            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
-        }
-        
         .thinking-content {
-            line-height: 1.8;
-            color: rgba(255, 255, 255, 0.95);
-            font-style: italic;
-            background: rgba(255, 255, 255, 0.15);
-            padding: 14px 16px;
-            border-radius: 8px;
-            border-left: 4px solid rgba(255, 255, 255, 0.5);
-            font-size: 13px;
-            backdrop-filter: blur(10px);
-        }
-        
-        /* Clear separator between thinking and main content */
-        .thinking-separator {
-            margin: 30px 0;
-            padding: 0;
-            border: none;
-            height: 2px;
-            background: linear-gradient(to right, #667eea, #764ba2, #667eea);
-            opacity: 0.3;
-            border-radius: 2px;
-        }
-        
-        /* Add visual spacing after thinking block */
-        .thinking-block + * {
-            margin-top: 28px !important;
-        }
-        
-        /* Main content section after thinking */
-        .main-response {
-            padding-top: 20px;
-            border-top: 3px solid #f0f0f0;
-            margin-top: 24px;
+            line-height: 1.6;
+            color: #495057;
         }
         
         /* Cost report styling */
@@ -468,8 +409,6 @@
             const assistantDiv = addMessage('', false);
             let fullResponse = '';
             let thinkingBlock = null;
-            let hasThinking = false;
-            
             try {
                 const response = await fetch('/chat', {
                     method: 'POST',
@@ -483,70 +422,36 @@
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
-                
                 while (true) {
                     const {done, value} = await reader.read();
                     if (done) break;
                     const chunk = decoder.decode(value);
                     const lines = chunk.split('\n');
-                    
                     for (const line of lines) {
                         if (line.startsWith('data: ')) {
                             try {
                                 const data = JSON.parse(line.slice(6));
-                                
                                 if (data.type === 'thinking_start') {
-                                    hasThinking = true;
                                     thinkingBlock = document.createElement('div');
                                     thinkingBlock.className = 'thinking-block';
                                     thinkingBlock.innerHTML = '<div class="thinking-label">💭 AI Thinking Process</div><div class="thinking-content"></div>';
                                     assistantDiv.appendChild(thinkingBlock);
-                                    
                                 } else if (data.type === 'thinking' && thinkingBlock) {
                                     const thinkingContent = thinkingBlock.querySelector('.thinking-content');
                                     thinkingContent.textContent += data.content;
-                                    
                                 } else if (data.type === 'thinking_end') {
-                                    // Add separator after thinking block
-                                    if (thinkingBlock) {
-                                        const separator = document.createElement('hr');
-                                        separator.className = 'thinking-separator';
-                                        assistantDiv.appendChild(separator);
-                                    }
                                     thinkingBlock = null;
-                                    
                                 } else if (data.type === 'content') {
                                     fullResponse += data.content;
-                                    
-                                    // Store thinking blocks
-                                    const thinkingBlocks = assistantDiv.querySelectorAll('.thinking-block, .thinking-separator');
-                                    
-                                    // Render markdown
                                     const tempDiv = document.createElement('div');
                                     tempDiv.innerHTML = marked.parse(fullResponse);
-                                    
-                                    // Clear and rebuild
+                                    const thinkingBlocks = assistantDiv.querySelectorAll('.thinking-block');
                                     assistantDiv.innerHTML = '';
-                                    
-                                    // Re-add thinking blocks first
                                     thinkingBlocks.forEach(block => assistantDiv.appendChild(block));
-                                    
-                                    // Add main content wrapper if there was thinking
-                                    if (hasThinking && tempDiv.firstChild) {
-                                        const mainResponse = document.createElement('div');
-                                        mainResponse.className = 'main-response';
-                                        while (tempDiv.firstChild) {
-                                            mainResponse.appendChild(tempDiv.firstChild);
-                                        }
-                                        assistantDiv.appendChild(mainResponse);
-                                    } else {
-                                        while (tempDiv.firstChild) {
-                                            assistantDiv.appendChild(tempDiv.firstChild);
-                                        }
+                                    while (tempDiv.firstChild) {
+                                        assistantDiv.appendChild(tempDiv.firstChild);
                                     }
-                                    
                                     chatContainer.scrollTop = chatContainer.scrollHeight;
-                                    
                                 } else if (data.type === 'cost_report') {
                                     const costDiv = document.createElement('div');
                                     costDiv.className = 'cost-report';
