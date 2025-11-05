@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Flask API wrapper for AI Teaching Assistant with Prompt Caching
+Flask API wrapper for AI Teaching Assistant with Enhanced Cost Tracking
 """
 from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
@@ -32,6 +32,7 @@ try:
     encoder = tiktoken.encoding_for_model("gpt-4")
 except ImportError:
     TIKTOKEN_AVAILABLE = False
+    print("⚠️  Warning: tiktoken not installed. Using approximation.")
 
 sessions = {}
 
@@ -71,6 +72,7 @@ print(f"📊 Token Count:")
 print(f"System Prompt: {count_tokens(CACHED_SYSTEM_PROMPT):,} tokens")
 print(f"Class Materials: {count_tokens(CACHED_MATERIALS):,} tokens")
 print(f"Total Cached: {CACHED_TOKENS_SIZE:,} tokens")
+print(f"Method: {'tiktoken (accurate)' if TIKTOKEN_AVAILABLE else 'approximation'}")
 print(f"{'='*60}\n")
 
 def get_or_create_session(session_id):
@@ -79,24 +81,20 @@ def get_or_create_session(session_id):
             'cache_created': False,
             'session_start_time': time.time(),
             'total_cost': 0.0,
-            'message_count': 0
+            'message_count': 0,
+            'total_input_tokens': 0,
+            'total_output_tokens': 0,
+            'total_cached_tokens': 0
         }
     return sessions[session_id]
-
-def calculate_cost(input_tokens, output_tokens, cache_write_tokens=0, cache_read_tokens=0):
-    input_cost = (input_tokens / 1_000_000) * PRICE_INPUT
-    output_cost = (output_tokens / 1_000_000) * PRICE_OUTPUT
-    cache_write_cost = (cache_write_tokens / 1_000_000) * PRICE_CACHE_WRITE
-    cache_read_cost = (cache_read_tokens / 1_000_000) * PRICE_CACHE_READ
-    total_cost = input_cost + output_cost + cache_write_cost + cache_read_cost
-    return total_cost
 
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({
         "status": "ok", 
         "model": MODEL,
-        "cached_size": int(CACHED_TOKENS_SIZE)
+        "cached_size": int(CACHED_TOKENS_SIZE),
+        "tiktoken_available": TIKTOKEN_AVAILABLE
     })
 
 @app.route('/chat', methods=['POST'])
@@ -122,50 +120,91 @@ def chat():
                 model=MODEL,
                 messages=messages,
                 temperature=0.7,
-                max_tokens=2000,
+                max_tokens=8000,  # Increased from 2000
                 stream=True
             )
             
             full_response = ""
+            thinking_content = ""
+            in_thinking = False
             
             for chunk in stream:
                 if chunk.choices[0].delta.content:
                     content = chunk.choices[0].delta.content
                     full_response += content
-                    yield f"data: {json.dumps({'content': content})}\n\n"
+                    
+                    # Detect thinking blocks
+                    if '<thinking>' in content:
+                        in_thinking = True
+                        yield f"data: {json.dumps({'type': 'thinking_start'})}\n\n"
+                    
+                    if in_thinking:
+                        thinking_content += content
+                        if '</thinking>' in content:
+                            in_thinking = False
+                            yield f"data: {json.dumps({'type': 'thinking_end', 'content': thinking_content})}\n\n"
+                            thinking_content = ""
+                        else:
+                            yield f"data: {json.dumps({'type': 'thinking', 'content': content})}\n\n"
+                    else:
+                        yield f"data: {json.dumps({'type': 'content', 'content': content})}\n\n"
             
-            # Calculate costs
+            # Calculate costs with accurate token counting
             question_tokens = count_tokens(user_message)
             output_tokens = count_tokens(full_response)
             
             if is_first_message:
-                cache_write_tokens = CACHED_TOKENS_SIZE
-                cache_read_tokens = 0
-                input_tokens = question_tokens
+                cache_tokens = CACHED_TOKENS_SIZE
+                cache_write_cost = (cache_tokens / 1_000_000) * PRICE_CACHE_WRITE
+                cache_read_cost = 0
                 session['cache_created'] = True
-                cost_type = "Cache Write"
+                cost_type = "Write"
             else:
-                cache_write_tokens = 0
-                cache_read_tokens = CACHED_TOKENS_SIZE
-                input_tokens = question_tokens
-                cost_type = "Cache Read"
+                cache_tokens = CACHED_TOKENS_SIZE
+                cache_write_cost = 0
+                cache_read_cost = (cache_tokens / 1_000_000) * PRICE_CACHE_READ
+                cost_type = "Read"
             
-            total_cost = calculate_cost(input_tokens, output_tokens, cache_write_tokens, cache_read_tokens)
+            input_cost = (question_tokens / 1_000_000) * PRICE_INPUT
+            output_cost = (output_tokens / 1_000_000) * PRICE_OUTPUT
+            total_cost = input_cost + output_cost + cache_write_cost + cache_read_cost
+            
+            # Update session stats
             session['total_cost'] += total_cost
             session['message_count'] += 1
+            session['total_input_tokens'] += question_tokens
+            session['total_output_tokens'] += output_tokens
+            session['total_cached_tokens'] += cache_tokens
             
-            # Simple cost report
-            cost_report = f"\n\n---\n\n**💰 Cost:** "
-            cost_report += f"{cost_type} {int(CACHED_TOKENS_SIZE):,} tokens | "
-            cost_report += f"Input {input_tokens:,} | Output {output_tokens:,} | "
-            cost_report += f"${total_cost:.6f} (≈¥{total_cost*7.2:.2f})\n\n"
-            cost_report += f"**Session:** {session['message_count']} messages | ${session['total_cost']:.6f} (≈¥{session['total_cost']*7.2:.2f})"
+            # Detailed cost report
+            cost_report = "\n\n---\n\n"
+            cost_report += "**💰 Cost Analysis (Detailed)**\n\n"
+            cost_report += f"**Model:** {MODEL}\n\n"
+            cost_report += f"**Pricing:** Input ${PRICE_INPUT}/1M | Output ${PRICE_OUTPUT}/1M | Cache Write ${PRICE_CACHE_WRITE}/1M | Cache Read ${PRICE_CACHE_READ}/1M\n\n"
+            cost_report += "**This Message:**\n"
+            cost_report += f"- 📦 Cache {cost_type}: {int(cache_tokens):,} tokens × ${PRICE_CACHE_WRITE if is_first_message else PRICE_CACHE_READ}/1M = ${cache_write_cost + cache_read_cost:.6f}\n"
+            cost_report += f"- 📥 Input: {question_tokens:,} tokens × ${PRICE_INPUT}/1M = ${input_cost:.6f}\n"
+            cost_report += f"- 📤 Output: {output_tokens:,} tokens × ${PRICE_OUTPUT}/1M = ${output_cost:.6f}\n"
+            cost_report += f"- **💵 Subtotal: ${total_cost:.6f} (≈¥{total_cost*7.2:.2f})**\n\n"
             
-            yield f"data: {json.dumps({'content': cost_report})}\n\n"
-            yield f"data: {json.dumps({'done': True})}\n\n"
+            # Session summary
+            elapsed_hours = (time.time() - session['session_start_time']) / 3600
+            storage_cost = (CACHED_TOKENS_SIZE / 1_000_000) * PRICE_CACHE_STORAGE * elapsed_hours
+            total_with_storage = session['total_cost'] + storage_cost
+            
+            cost_report += "**📊 Session Summary:**\n"
+            cost_report += f"- Messages: {session['message_count']}\n"
+            cost_report += f"- Total Input: {session['total_input_tokens']:,} tokens\n"
+            cost_report += f"- Total Output: {session['total_output_tokens']:,} tokens\n"
+            cost_report += f"- API Cost: ${session['total_cost']:.6f} (≈¥{session['total_cost']*7.2:.2f})\n"
+            cost_report += f"- Cache Storage ({elapsed_hours:.2f}h): ${storage_cost:.6f} (≈¥{storage_cost*7.2:.2f})\n"
+            cost_report += f"- **💰 Total Cost: ${total_with_storage:.6f} (≈¥{total_with_storage*7.2:.2f})**\n"
+            
+            yield f"data: {json.dumps({'type': 'cost_report', 'content': cost_report})}\n\n"
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
             
         except Exception as e:
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
     
     return Response(generate(), mimetype='text/event-stream')
 
@@ -180,5 +219,6 @@ if __name__ == '__main__':
     print("🚀 AI Teaching Assistant API")
     print(f"📚 Model: {MODEL}")
     print(f"💾 Caching: ENABLED")
+    print(f"📝 Max Tokens: 8000")
     print(f"🌐 http://0.0.0.0:5000")
     app.run(host='0.0.0.0', port=5000, debug=False)

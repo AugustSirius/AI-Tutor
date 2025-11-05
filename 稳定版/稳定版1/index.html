@@ -123,43 +123,6 @@
             text-align: left;
         }
         .message-content th { background: #f5f5f5; font-weight: 600; }
-        
-        /* Thinking block styling */
-        .thinking-block {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-left: 4px solid #6c757d;
-            padding: 12px 16px;
-            margin: 16px 0;
-            border-radius: 6px;
-            font-size: 13px;
-            color: #495057;
-        }
-        .thinking-label {
-            font-weight: 700;
-            font-size: 11px;
-            text-transform: uppercase;
-            color: #6c757d;
-            margin-bottom: 8px;
-            letter-spacing: 0.5px;
-        }
-        .thinking-content {
-            line-height: 1.6;
-            color: #495057;
-        }
-        
-        /* Cost report styling */
-        .cost-report {
-            background: #fff8e1;
-            border: 1px solid #ffe082;
-            border-left: 4px solid #ffa726;
-            padding: 14px 18px;
-            margin-top: 20px;
-            border-radius: 6px;
-            font-size: 13px;
-        }
-        .cost-report strong { color: #e65100; }
-        
         .input-container { padding: 20px 30px; border-top: 1px solid #e5e5e5; }
         .input-wrapper {
             display: flex;
@@ -289,38 +252,21 @@
         </div>
         <div class="main">
             <div class="header">
-                <h1>Mass Spectrometry AI Teaching Assistant</h1>
+                <h1>AI Teaching Assistant</h1>
                 <div class="cache-indicator">💾 Cache: ON</div>
             </div>
             <div class="chat-container" id="chatContainer">
                 <div class="message assistant">
                     <div class="avatar">AI</div>
                     <div class="message-content">
-                        <p><strong>Welcome to Mass Spectrometry AI Teaching Assistant! 🔬</strong></p>
-                        <p>I'm your intelligent teaching assistant powered by <strong>Gemini 2.5 Flash</strong> with advanced caching technology.</p>
-                        <p><strong>🎯 What I can help you with:</strong></p>
-                        <ul>
-                            <li>📚 <strong>Course Content:</strong> Explain mass spectrometry principles, instrumentation, and applications</li>
-                            <li>🔍 <strong>Technical Details:</strong> Ion sources, mass analyzers, detectors, and their working principles</li>
-                            <li>🧪 <strong>Practical Guidance:</strong> Experimental design, troubleshooting, and best practices</li>
-                            <li>📊 <strong>Data Analysis:</strong> Spectrum interpretation, isotope patterns, and quantitative methods</li>
-                            <li>🎓 <strong>PhD-Level Support:</strong> Research applications in proteomics, metabolomics, and beyond</li>
-                        </ul>
-                        <p><strong>💡 Key Features:</strong></p>
-                        <ul>
-                            <li>💾 <strong>Smart Caching:</strong> All course materials (800K+ tokens) loaded in context - 90% cost reduction</li>
-                            <li>📖 <strong>Complete Knowledge:</strong> Every answer based on full course materials - no information missed</li>
-                            <li>🔗 <strong>Precise Citations:</strong> All answers reference specific sections from course materials</li>
-                            <li>💬 <strong>Context Memory:</strong> I remember our conversation for follow-up questions</li>
-                            <li>⚡ <strong>Real-time Response:</strong> Instant answers with detailed cost tracking</li>
-                        </ul>
-                        <p><strong>Ask me anything about mass spectrometry!</strong> 🚀</p>
+                        <p>Hello! I'm your AI teaching assistant with <strong>enhanced caching</strong> for cost optimization. 💾</p>
+                        <p>How can I help you today?</p>
                     </div>
                 </div>
             </div>
             <div class="input-container">
                 <div class="input-wrapper">
-                    <input type="text" id="messageInput" placeholder="Ask about mass spectrometry..." autocomplete="off" />
+                    <input type="text" id="messageInput" placeholder="Type your message..." autocomplete="off" />
                     <button id="sendButton">Send</button>
                 </div>
             </div>
@@ -408,7 +354,6 @@
             sendButton.disabled = true;
             const assistantDiv = addMessage('', false);
             let fullResponse = '';
-            let thinkingBlock = null;
             try {
                 const response = await fetch('/chat', {
                     method: 'POST',
@@ -431,36 +376,13 @@
                         if (line.startsWith('data: ')) {
                             try {
                                 const data = JSON.parse(line.slice(6));
-                                if (data.type === 'thinking_start') {
-                                    thinkingBlock = document.createElement('div');
-                                    thinkingBlock.className = 'thinking-block';
-                                    thinkingBlock.innerHTML = '<div class="thinking-label">💭 AI Thinking Process</div><div class="thinking-content"></div>';
-                                    assistantDiv.appendChild(thinkingBlock);
-                                } else if (data.type === 'thinking' && thinkingBlock) {
-                                    const thinkingContent = thinkingBlock.querySelector('.thinking-content');
-                                    thinkingContent.textContent += data.content;
-                                } else if (data.type === 'thinking_end') {
-                                    thinkingBlock = null;
-                                } else if (data.type === 'content') {
+                                if (data.content) {
                                     fullResponse += data.content;
-                                    const tempDiv = document.createElement('div');
-                                    tempDiv.innerHTML = marked.parse(fullResponse);
-                                    const thinkingBlocks = assistantDiv.querySelectorAll('.thinking-block');
-                                    assistantDiv.innerHTML = '';
-                                    thinkingBlocks.forEach(block => assistantDiv.appendChild(block));
-                                    while (tempDiv.firstChild) {
-                                        assistantDiv.appendChild(tempDiv.firstChild);
-                                    }
-                                    chatContainer.scrollTop = chatContainer.scrollHeight;
-                                } else if (data.type === 'cost_report') {
-                                    const costDiv = document.createElement('div');
-                                    costDiv.className = 'cost-report';
-                                    costDiv.innerHTML = marked.parse(data.content);
-                                    assistantDiv.appendChild(costDiv);
+                                    assistantDiv.innerHTML = marked.parse(fullResponse);
                                     chatContainer.scrollTop = chatContainer.scrollHeight;
                                 }
                             } catch (e) {
-                                console.error('Parse error:', e);
+                                // Ignore parse errors
                             }
                         }
                     }
