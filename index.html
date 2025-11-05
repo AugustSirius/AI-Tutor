@@ -126,26 +126,29 @@
         
         /* Thinking block styling */
         .thinking-block {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-left: 4px solid #6c757d;
-            padding: 12px 16px;
-            margin: 16px 0;
-            border-radius: 6px;
+            background: #e9ecef;
+            border: 2px solid #adb5bd;
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin: 0 0 20px 0;
             font-size: 13px;
             color: #495057;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         .thinking-label {
             font-weight: 700;
-            font-size: 11px;
+            font-size: 12px;
             text-transform: uppercase;
-            color: #6c757d;
-            margin-bottom: 8px;
-            letter-spacing: 0.5px;
+            color: #495057;
+            margin-bottom: 10px;
+            letter-spacing: 0.8px;
+            border-bottom: 1px solid #adb5bd;
+            padding-bottom: 8px;
         }
         .thinking-content {
-            line-height: 1.6;
+            line-height: 1.7;
             color: #495057;
+            white-space: pre-wrap;
         }
         
         /* Cost report styling */
@@ -434,12 +437,16 @@
                                 if (data.type === 'thinking_start') {
                                     thinkingBlock = document.createElement('div');
                                     thinkingBlock.className = 'thinking-block';
-                                    thinkingBlock.innerHTML = '<div class="thinking-label">💭 AI Thinking Process</div><div class="thinking-content"></div>';
+                                    thinkingBlock.innerHTML = '<div class="thinking-label">💭 AI THINKING PROCESS</div><div class="thinking-content"></div>';
                                     assistantDiv.appendChild(thinkingBlock);
                                 } else if (data.type === 'thinking' && thinkingBlock) {
                                     const thinkingContent = thinkingBlock.querySelector('.thinking-content');
                                     thinkingContent.textContent += data.content;
                                 } else if (data.type === 'thinking_end') {
+                                    // Add a separator after thinking
+                                    const separator = document.createElement('div');
+                                    separator.style.cssText = 'height: 20px; border-bottom: 2px solid #e5e5e5; margin: 20px 0;';
+                                    assistantDiv.appendChild(separator);
                                     thinkingBlock = null;
                                 } else if (data.type === 'content') {
                                     fullResponse += data.content;
