@@ -15,6 +15,8 @@
             overflow: hidden;
         }
         .container { display: flex; height: 100vh; }
+        
+        /* Sidebar */
         .sidebar {
             width: 300px;
             background: white;
@@ -45,6 +47,8 @@
         .sidebar-item:hover { background: #ebebeb; }
         .sidebar-item-title { font-size: 13px; font-weight: 500; }
         .sidebar-item-icon { color: #666; font-size: 18px; }
+        
+        /* Main area */
         .main { flex: 1; display: flex; flex-direction: column; background: white; }
         .header {
             padding: 20px 30px;
@@ -62,7 +66,14 @@
             border-radius: 12px;
             font-weight: 600;
         }
-        .chat-container { flex: 1; overflow-y: auto; padding: 30px; }
+        
+        /* Chat */
+        .chat-container { 
+            flex: 1; 
+            overflow-y: auto; 
+            padding: 30px;
+            -webkit-overflow-scrolling: touch;
+        }
         .message { margin-bottom: 25px; display: flex; gap: 15px; }
         .message.user { flex-direction: row-reverse; }
         .avatar {
@@ -86,6 +97,8 @@
             border-radius: 18px;
         }
         .message.assistant .message-content { padding: 12px 0; }
+        
+        /* Markdown styling */
         .message-content h1, .message-content h2, .message-content h3 {
             margin-top: 16px;
             margin-bottom: 8px;
@@ -116,6 +129,8 @@
             border-collapse: collapse;
             width: 100%;
             margin: 12px 0;
+            overflow-x: auto;
+            display: block;
         }
         .message-content th, .message-content td {
             border: 1px solid #e5e5e5;
@@ -124,101 +139,46 @@
         }
         .message-content th { background: #f5f5f5; font-weight: 600; }
         
-        /* Enhanced thinking block styling with clear separation */
+        /* SIMPLE thinking block - clear separation */
         .thinking-block {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            padding: 18px 22px;
-            margin: 24px 0;
-            border-radius: 12px;
-            font-size: 13px;
-            color: white;
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.25);
-            position: relative;
+            background: #e8f4f8;
+            border-left: 4px solid #0288d1;
+            padding: 16px;
+            margin: 20px 0;
+            border-radius: 4px;
         }
-        
-        .thinking-block::before {
-            content: '';
-            position: absolute;
-            top: -12px;
-            left: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 4px 12px;
-            border-radius: 6px;
-            font-size: 10px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
-        }
-        
         .thinking-label {
-            font-weight: 700;
+            font-weight: 600;
             font-size: 12px;
+            color: #0277bd;
+            margin-bottom: 10px;
             text-transform: uppercase;
-            color: rgba(255, 255, 255, 0.95);
-            margin-bottom: 12px;
-            letter-spacing: 1px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            letter-spacing: 0.5px;
         }
-        
-        .thinking-label::before {
-            content: '🧠';
-            font-size: 18px;
-            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
-        }
-        
         .thinking-content {
-            line-height: 1.8;
-            color: rgba(255, 255, 255, 0.95);
-            font-style: italic;
-            background: rgba(255, 255, 255, 0.15);
-            padding: 14px 16px;
-            border-radius: 8px;
-            border-left: 4px solid rgba(255, 255, 255, 0.5);
-            font-size: 13px;
-            backdrop-filter: blur(10px);
+            line-height: 1.6;
+            color: #546e7a;
+            font-size: 14px;
         }
         
-        /* Clear separator between thinking and main content */
+        /* Simple separator after thinking */
         .thinking-separator {
-            margin: 30px 0;
-            padding: 0;
-            border: none;
-            height: 2px;
-            background: linear-gradient(to right, #667eea, #764ba2, #667eea);
-            opacity: 0.3;
-            border-radius: 2px;
+            border-top: 2px solid #e0e0e0;
+            margin: 20px 0;
         }
         
-        /* Add visual spacing after thinking block */
-        .thinking-block + * {
-            margin-top: 28px !important;
-        }
-        
-        /* Main content section after thinking */
-        .main-response {
-            padding-top: 20px;
-            border-top: 3px solid #f0f0f0;
-            margin-top: 24px;
-        }
-        
-        /* Cost report styling */
+        /* Cost report */
         .cost-report {
             background: #fff8e1;
-            border: 1px solid #ffe082;
             border-left: 4px solid #ffa726;
             padding: 14px 18px;
             margin-top: 20px;
-            border-radius: 6px;
+            border-radius: 4px;
             font-size: 13px;
         }
         .cost-report strong { color: #e65100; }
         
+        /* Input area */
         .input-container { padding: 20px 30px; border-top: 1px solid #e5e5e5; }
         .input-wrapper {
             display: flex;
@@ -250,6 +210,8 @@
         }
         #sendButton:hover { background: #1a1a1a; }
         #sendButton:disabled { background: #ccc; cursor: not-allowed; }
+        
+        /* Modal */
         .modal {
             display: none;
             position: fixed;
@@ -293,13 +255,6 @@
         .markdown-content p { margin: 12px 0; }
         .markdown-content ul, .markdown-content ol { margin: 12px 0; padding-left: 30px; }
         .markdown-content li { margin: 8px 0; }
-        .markdown-content table { border-collapse: collapse; width: 100%; margin: 15px 0; }
-        .markdown-content th, .markdown-content td {
-            border: 1px solid #e5e5e5;
-            padding: 10px;
-            text-align: left;
-        }
-        .markdown-content th { background: #f5f5f5; font-weight: 600; }
         .markdown-content code {
             background: #f5f5f5;
             padding: 2px 6px;
@@ -314,9 +269,85 @@
             margin: 15px 0;
         }
         .markdown-content pre code { background: none; padding: 0; }
+        
+        /* MOBILE RESPONSIVE */
         @media (max-width: 768px) {
-            .sidebar { display: none; }
-            .message-content { max-width: 85%; }
+            .sidebar { 
+                display: none; 
+            }
+            .header {
+                padding: 15px 20px;
+                flex-direction: column;
+                gap: 10px;
+                align-items: flex-start;
+            }
+            .header h1 { 
+                font-size: 16px; 
+            }
+            .chat-container { 
+                padding: 20px 15px; 
+            }
+            .message { 
+                margin-bottom: 20px; 
+                gap: 10px;
+            }
+            .message-content { 
+                max-width: 85%; 
+                font-size: 15px;
+            }
+            .message.user .message-content {
+                padding: 10px 14px;
+            }
+            .avatar {
+                width: 28px;
+                height: 28px;
+                font-size: 12px;
+            }
+            .thinking-block {
+                padding: 12px;
+                margin: 15px 0;
+            }
+            .thinking-label {
+                font-size: 11px;
+            }
+            .thinking-content {
+                font-size: 13px;
+            }
+            .input-container { 
+                padding: 15px; 
+            }
+            .input-wrapper {
+                padding: 8px 15px;
+            }
+            #messageInput {
+                font-size: 16px; /* Prevent zoom on iOS */
+            }
+            #sendButton {
+                padding: 8px 16px;
+                font-size: 13px;
+            }
+            .cost-report {
+                font-size: 12px;
+                padding: 12px 14px;
+            }
+            .modal-content {
+                margin: 20px;
+                padding: 20px;
+            }
+        }
+        
+        /* Very small screens */
+        @media (max-width: 480px) {
+            .header h1 { 
+                font-size: 14px; 
+            }
+            .message-content { 
+                max-width: 90%; 
+            }
+            .cache-indicator {
+                font-size: 10px;
+                padding: 4px 8px;
+            }
         }
     </style>
 </head>
@@ -367,7 +398,7 @@
                         </ul>
                         <p><strong>💡 Key Features:</strong></p>
                         <ul>
-                            <li>💾 <strong>Smart Caching:</strong> All course materials (800K+ tokens) loaded in context - 90% cost reduction</li>
+                            <li>💾 <strong>Smart Caching:</strong> All course materials (10K+ tokens) loaded in context - 90% cost reduction</li>
                             <li>📖 <strong>Complete Knowledge:</strong> Every answer based on full course materials - no information missed</li>
                             <li>🔗 <strong>Precise Citations:</strong> All answers reference specific sections from course materials</li>
                             <li>💬 <strong>Context Memory:</strong> I remember our conversation for follow-up questions</li>
@@ -499,7 +530,7 @@
                                     hasThinking = true;
                                     thinkingBlock = document.createElement('div');
                                     thinkingBlock.className = 'thinking-block';
-                                    thinkingBlock.innerHTML = '<div class="thinking-label">💭 AI Thinking Process</div><div class="thinking-content"></div>';
+                                    thinkingBlock.innerHTML = '<div class="thinking-label">🤔 Thinking...</div><div class="thinking-content"></div>';
                                     assistantDiv.appendChild(thinkingBlock);
                                     
                                 } else if (data.type === 'thinking' && thinkingBlock) {
@@ -507,9 +538,9 @@
                                     thinkingContent.textContent += data.content;
                                     
                                 } else if (data.type === 'thinking_end') {
-                                    // Add separator after thinking block
+                                    // Add simple separator after thinking
                                     if (thinkingBlock) {
-                                        const separator = document.createElement('hr');
+                                        const separator = document.createElement('div');
                                         separator.className = 'thinking-separator';
                                         assistantDiv.appendChild(separator);
                                     }
@@ -518,31 +549,18 @@
                                 } else if (data.type === 'content') {
                                     fullResponse += data.content;
                                     
-                                    // Store thinking blocks
-                                    const thinkingBlocks = assistantDiv.querySelectorAll('.thinking-block, .thinking-separator');
+                                    // Store thinking blocks and separator
+                                    const savedElements = assistantDiv.querySelectorAll('.thinking-block, .thinking-separator');
                                     
                                     // Render markdown
                                     const tempDiv = document.createElement('div');
                                     tempDiv.innerHTML = marked.parse(fullResponse);
                                     
-                                    // Clear and rebuild
+                                    // Rebuild: thinking blocks + separator + content
                                     assistantDiv.innerHTML = '';
-                                    
-                                    // Re-add thinking blocks first
-                                    thinkingBlocks.forEach(block => assistantDiv.appendChild(block));
-                                    
-                                    // Add main content wrapper if there was thinking
-                                    if (hasThinking && tempDiv.firstChild) {
-                                        const mainResponse = document.createElement('div');
-                                        mainResponse.className = 'main-response';
-                                        while (tempDiv.firstChild) {
-                                            mainResponse.appendChild(tempDiv.firstChild);
-                                        }
-                                        assistantDiv.appendChild(mainResponse);
-                                    } else {
-                                        while (tempDiv.firstChild) {
-                                            assistantDiv.appendChild(tempDiv.firstChild);
-                                        }
+                                    savedElements.forEach(el => assistantDiv.appendChild(el));
+                                    while (tempDiv.firstChild) {
+                                        assistantDiv.appendChild(tempDiv.firstChild);
                                     }
                                     
                                     chatContainer.scrollTop = chatContainer.scrollHeight;
